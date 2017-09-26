@@ -1,0 +1,124 @@
+---
+title       : Week 4 Assignment created with Slidify
+subtitle    : Classification and Regression Trees - 26/09/2017
+author      : Lda
+job         : 
+framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow      # 
+widgets     : [bootstrap, quiz, shiny, interactive]            # {mathjax, quiz, bootstrap}
+mode        : selfcontained # {standalone, draft}
+ext_widgets : {rCharts: [libraries/nvd3]}
+---
+
+<style type="text/css">
+
+code.r{ /* Code block */
+    font-size: 10px;
+}
+
+</style>
+
+### Week 4 Assignment - Introduction
+
+This is an R Markdown document that create a web page presentation that features a plot created with Slidify for the week 4 assignment of the course Developping Data Products on Coursera.
+
+This simple App calculates the MSE of a Regression Trees using rpart package according to several tree sizes selected from the user input.
+
+This App uses the following packages ; ElemStatLearn, rpart, partykit and MASS and loads the prostate dataset from the ElemStatLearn package.
+
+Next slide the application is presented fully fonctionnal with the slider on the left hand side panel allowing the user to select the number of tree in order to decrease the mean squre error for this predictive analysis. You may need to use the slider on the right hand side of the next slide to scroll down a little to be able to see the changes operated but the slider selecting the number of trees.
+
+---
+
+<iframe src="https://ldablue.shinyapps.io/Assignment_week_4/" style="border: none; width: 100%; height: 550px"></iframe>
+
+---
+
+### ui.R
+
+```{r, eval=FALSE}
+
+shinyUI(fluidPage(
+    titlePanel("Classification and Regression Trees"),
+    # Sidebar with controls to select a dataset
+    # of observations to view
+    sidebarLayout(
+        sidebarPanel(
+            tags$div(
+                tags$h5("Libraries to be loaded"),
+                tags$h6(
+                    tags$br(),
+                    tags$strong("ElemStatLearn"), tags$br(),
+                    tags$strong("rpart"), tags$br(),
+                    tags$strong("partykit"), tags$br(),
+                    tags$strong("MASS"), tags$br(), tags$br(), "Make sure to have those libraries installed in RStudio before running the app"
+                )
+            ),
+            selectInput("dataset", "Choose a dataset:", choices = c("ElemStatLearn/prostate")),
+            sliderInput("ptrees", "Number of trees:", min = 1, max = 5, value = 4)
+        ),
+        mainPanel(
+            h4(textOutput("textpresentation"), style="color:red"),
+            h4(textOutput("text1")),
+            tableOutput(outputId = "data"),
+            h4(textOutput("textpresentation2")),
+            h5(htmlOutput("text2")),
+            h5(htmlOutput("text3")),
+            h4(textOutput("text5")),
+            plotOutput(outputId = "main_plot2", height = "200px"),
+            h4(textOutput("predict1")),
+            h3(strong(textOutput("predictResult")), style="color:red"),
+            h4(textOutput("text4")),
+            plotOutput(outputId = "main_plot", height = "200px")
+        )
+    )
+))
+```
+
+---
+
+### server.R
+
+```{r, eval=FALSE}
+library(shiny)
+shinyServer(function(input, output) {
+    prostate$gleason = ifelse(prostate$gleason == 6, 0, 1)
+    pros.train <- subset(prostate, train == TRUE)[,1:9]
+    pros.test <- subset(prostate, train == FALSE)[,1:9]
+    tree.pros <- rpart::rpart(lpsa~., data = pros.train)
+    cp.table <- print(tree.pros$cptable) 
+        lerfd.split <- subset( cp.table, cp.table[,3] == min(cp.table[,3]))
+        lercv.split <- subset( cp.table, cp.table[,4] == min(cp.table[,4]))
+            mydata <- reactive({
+            cp = min(tree.pros$cptable[input$ptrees + 1,])
+            prune(tree.pros, cp = cp)
+            
+        })
+        mydata2 <- reactive({
+            party.pros.test <- predict(mydata(), newdata = pros.test)
+            rpart.resid = party.pros.test - pros.test$lpsa
+            as.character(mean(rpart.resid^2))
+        })
+        output$textpresentation <- renderText(enc2utf8("This simple App calculates the MSE of a Regression Trees using rpart package according to several tree sizes selected from the user input."))
+        output$text1 <- renderText(enc2utf8(paste("1/ Calculate and print the error table of the rpart function from the ", input$dataset, " dataset")))
+        output$data <- renderTable(cp.table)
+        output$textpresentation2 <- renderText(enc2utf8(paste("2/ Read the different errors from the following table")))
+        output$text2 <- renderText(paste("the lowest error on the full dataset is <strong>",min(cp.table[,3]), "</strong> from the rel error column is produced with <strong>", lerfd.split[1,2],"</strong> split(s)"))
+        output$text3 <- renderText(paste("the lowest error using cross validation is <strong>",min(cp.table[,4]), "</strong> from the xerror column is produced with <strong>", lercv.split[1,2],"</strong> split(s)"))
+        output$text5 <- renderText(enc2utf8(paste("3/ Print the pruned tree according to the user input")))
+        output$main_plot2 <- renderPlot({
+            op <- par(mar = rep(0, 4))
+            par(op)
+            plot(as.party(mydata()))
+        })
+        output$predict1 <- renderText(enc2utf8("4/ Print the Mean Square Error value according to the user input"))
+        output$predictResult <- renderText(enc2utf8(mydata2()))
+        output$text4 <- renderText(enc2utf8(paste("5/ Finally print the full tree")))
+        output$main_plot <- renderPlot({
+            op <- par(mar = rep(0, 4))
+            par(op)
+            plot(as.party(tree.pros))
+        })
+    })
+```
